@@ -23,9 +23,19 @@ var u1 = &user{
 
 func main() {
 	router.POST("/login", login)
-	log.Fatal(router.Run(":8080"))
+	log.Fatal(router.Run())
 }
 
 func login(c *gin.Context) {
-	c.JSON(http.StatusOK, "hey")
+	var u user
+	if err := c.ShouldBindJSON(&u); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, err)
+		return
+	}
+	if u.Username != u1.Username || u.Password != u1.Password {
+		c.JSON(http.StatusUnauthorized, "Please provide login credentials")
+		return
+	}
+
+	c.JSON(http.StatusOK, u)
 }

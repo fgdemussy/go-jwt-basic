@@ -24,6 +24,13 @@ var u1 = &user{
 	Password: "pass",
 }
 
+func init() {
+	_, ok := os.LookupEnv("ACCESS_SECRET")
+	if !ok {
+		log.Fatalln("You need to define ACCESS_SECRET environment variable first.")
+	}
+}
+
 func main() {
 	router.POST("/login", login)
 	log.Fatal(router.Run())
@@ -39,12 +46,7 @@ func login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, "Please provide login credentials")
 		return
 	}
-	secret, ok := os.LookupEnv("ACCESS_SECRET")
-	if !ok {
-		log.Fatalln("undefined ACCESS_SECRET")
-	}
-	log.Printf("secret: %v", secret)
-	token, err := createToken(u1.ID, secret)
+	token, err := createToken(u1.ID, os.Getenv("ACCESS_SECRET"))
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return

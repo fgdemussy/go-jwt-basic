@@ -38,6 +38,11 @@ func init() {
 	if !ok {
 		log.Fatalln("You need to define ACCESS_SECRET environment variable first.")
 	}
+	_, ok = os.LookupEnv("REFRESH_SECRET")
+	if !ok {
+		log.Fatalln("You need to define REFRESH_SECRET environment variable first.")
+	}
+
 	var client *redis.Client
 	//Initializing redis
 	dsn, ok := os.LookupEnv("REDIS_DSN")

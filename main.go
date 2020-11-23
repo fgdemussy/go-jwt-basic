@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -34,6 +35,8 @@ var u1 = &user{
 	Password: "pass",
 }
 
+var client *redis.Client
+
 func init() {
 	_, ok := os.LookupEnv("ACCESS_SECRET")
 	if !ok {
@@ -43,8 +46,6 @@ func init() {
 	if !ok {
 		log.Fatalln("You need to define REFRESH_SECRET environment variable first.")
 	}
-
-	var client *redis.Client
 	dsn, ok := os.LookupEnv("REDIS_DSN")
 	if !ok {
 		dsn = "localhost:6379"
@@ -78,7 +79,15 @@ func login(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, token)
+	err = createAuth(u1.ID, token)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, err.Error())
+	}
+	tokens := map[string]string{
+		"access_token":  token.AccessToken,
+		"refresh_token": token.RefreshToken,
+	}
+	c.JSON(http.StatusOK, tokens)
 }
 
 func createToken(userID uint64, accessSecret, refereshSecret string) (*tokenDetails, error) {
@@ -112,4 +121,20 @@ func createToken(userID uint64, accessSecret, refereshSecret string) (*tokenDeta
 	}
 	td.RefreshToken = srt
 	return td, nil
+}
+
+func createAuth(userID uint64, td *tokenDetails) error {
+	at := time.Unix(td.AtExpires, 0) //converting Unix to UTC(to Time object)
+	rt := time.Unix(td.RtExpires, 0)
+	now := time.Now()
+
+	errAccess := client.Set(td.AccessUUID, strconv.Itoa(int(userID)), at.Sub(now)).Err()
+	if errAccess != nil {
+		return errAccess
+	}
+	errRefresh := client.Set(td.RefreshUUID, strconv.Itoa(int(userID)), rt.Sub(now)).Err()
+	if errRefresh != nil {
+		return errRefresh
+	}
+	return nil
 }

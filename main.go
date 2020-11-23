@@ -20,6 +20,12 @@ type user struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+type tokens struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 type tokenDetails struct {
 	AccessToken  string
 	RefreshToken string
@@ -67,7 +73,7 @@ func main() {
 func login(c *gin.Context) {
 	var u user
 	if err := c.ShouldBindJSON(&u); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, err)
+		c.JSON(http.StatusUnprocessableEntity, "Are you even providing credentials?")
 		return
 	}
 	if u.Username != u1.Username || u.Password != u1.Password {
@@ -83,9 +89,9 @@ func login(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 	}
-	tokens := map[string]string{
-		"access_token":  token.AccessToken,
-		"refresh_token": token.RefreshToken,
+	tokens := &tokens{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
 	}
 	c.JSON(http.StatusOK, tokens)
 }

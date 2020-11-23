@@ -9,6 +9,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
+	"github.com/twinj/uuid"
 )
 
 var router = gin.Default()
@@ -18,11 +19,11 @@ type user struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
-type TokenDetails struct {
+type tokenDetails struct {
 	AccessToken  string
 	RefreshToken string
-	AccessUuid   string
-	RefreshUuid  string
+	AccessUUID   string
+	RefreshUUID  string
 	AtExpires    int64
 	RtExpires    int64
 }
@@ -44,7 +45,6 @@ func init() {
 	}
 
 	var client *redis.Client
-	//Initializing redis
 	dsn, ok := os.LookupEnv("REDIS_DSN")
 	if !ok {
 		dsn = "localhost:6379"
@@ -73,7 +73,7 @@ func login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, "Please provide login credentials")
 		return
 	}
-	token, err := createToken(u1.ID, os.Getenv("ACCESS_SECRET"))
+	token, err := createToken(u1.ID, os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET"))
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
@@ -81,16 +81,35 @@ func login(c *gin.Context) {
 	c.JSON(http.StatusOK, token)
 }
 
-func createToken(userID uint64, secret string) (string, error) {
+func createToken(userID uint64, accessSecret, refereshSecret string) (*tokenDetails, error) {
+	td := &tokenDetails{}
+	td.AtExpires = time.Now().Add(time.Minute * 15).Unix()
+	td.AccessUUID = uuid.NewV4().String()
+	td.RtExpires = time.Now().Add(time.Hour * 24 * 7).Unix()
+	td.RefreshUUID = uuid.NewV4().String()
+
 	var err error
 	atClaims := jwt.MapClaims{}
 	atClaims["authorized"] = true
+	atClaims["access_uuid"] = td.AccessUUID
 	atClaims["user_id"] = userID
-	atClaims["exp"] = time.Now().Add(time.Minute * 15).Unix()
+	atClaims["exp"] = td.AtExpires
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
-	token, err := at.SignedString([]byte(secret))
+	sat, err := at.SignedString([]byte(accessSecret))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return token, nil
+	td.AccessToken = sat
+
+	rtClaims := jwt.MapClaims{}
+	rtClaims["exp"] = td.RtExpires
+	rtClaims["refresh_uuid"] = td.RefreshUUID
+	rtClaims["user_id"] = userID
+	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
+	srt, err := rt.SignedString([]byte(refereshSecret))
+	if err != nil {
+		return nil, err
+	}
+	td.RefreshToken = srt
+	return td, nil
 }

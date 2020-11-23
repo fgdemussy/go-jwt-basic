@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
 )
 
 var router = gin.Default()
@@ -16,6 +17,14 @@ type user struct {
 	ID       uint64 `json:"id"`
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+type TokenDetails struct {
+	AccessToken  string
+	RefreshToken string
+	AccessUuid   string
+	RefreshUuid  string
+	AtExpires    int64
+	RtExpires    int64
 }
 
 var u1 = &user{
@@ -28,6 +37,19 @@ func init() {
 	_, ok := os.LookupEnv("ACCESS_SECRET")
 	if !ok {
 		log.Fatalln("You need to define ACCESS_SECRET environment variable first.")
+	}
+	var client *redis.Client
+	//Initializing redis
+	dsn, ok := os.LookupEnv("REDIS_DSN")
+	if !ok {
+		dsn = "localhost:6379"
+	}
+	client = redis.NewClient(&redis.Options{
+		Addr: dsn, //redis port
+	})
+	_, err := client.Ping().Result()
+	if err != nil {
+		panic(err)
 	}
 }
 

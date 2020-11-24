@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -33,6 +35,16 @@ type tokenDetails struct {
 	RefreshUUID  string
 	AtExpires    int64
 	RtExpires    int64
+}
+
+type accessDetails struct {
+	AccessUUID string
+	UserID     uint64
+}
+
+type todo struct {
+	UserID uint64 `json:"user_id"`
+	Title  string `json:"title"`
 }
 
 var u1 = &user{
@@ -67,6 +79,7 @@ func init() {
 
 func main() {
 	router.POST("/login", login)
+	router.POST("/todos", createTodo)
 	log.Fatal(router.Run())
 }
 
@@ -143,4 +156,94 @@ func createAuth(userID uint64, td *tokenDetails) error {
 		return errRefresh
 	}
 	return nil
+}
+
+func extractToken(r *http.Request) string {
+	payload := r.Header.Get("Authorization")
+	parts := strings.Split(payload, " ")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return ""
+}
+
+func verifyToken(r *http.Request) (*jwt.Token, error) {
+	tokenString := extractToken(r)
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		//Make sure that the token method conform to "SigningMethodHMAC"
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(os.Getenv("ACCESS_SECRET")), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+func tokenValid(r *http.Request) error {
+	token, err := verifyToken(r)
+	if err != nil {
+		return err
+	}
+	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
+		return err
+	}
+	return nil
+}
+
+func extractTokenMetadata(r *http.Request) (*accessDetails, error) {
+	token, err := verifyToken(r)
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if ok && token.Valid {
+		accessUUID, ok := claims["access_uuid"].(string)
+		if !ok {
+			return nil, err
+		}
+		userID, err := strconv.ParseUint(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		return &accessDetails{
+			AccessUUID: accessUUID,
+			UserID:     userID,
+		}, nil
+	}
+	return nil, err
+}
+
+func fetchAuth(authD *accessDetails) (uint64, error) {
+	userid, err := client.Get(authD.AccessUUID).Result()
+	if err != nil {
+		return 0, err
+	}
+	userID, _ := strconv.ParseUint(userid, 10, 64)
+	return userID, nil
+}
+
+func createTodo(c *gin.Context) {
+	var td *todo
+	if err := c.ShouldBindJSON(&td); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, "invalid json")
+		return
+	}
+	tokenAuth, err := extractTokenMetadata(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, err := fetchAuth(tokenAuth)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	td.UserID = userID
+
+	//you can proceed to save the Todo to a database
+	//but we will just return it to the caller here:
+	c.JSON(http.StatusCreated, td)
 }

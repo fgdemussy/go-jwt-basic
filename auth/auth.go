@@ -12,59 +12,74 @@ import (
 	"github.com/go-redis/redis"
 )
 
+// Authable provides an interface to deal with required operations to manage AccessDetails in a datastore
+type Authable interface {
+	Creator
+	Deletable
+	Refreshable
+	Fetchable
+}
+
+// Creator allows persistence in a datastore
+type Creator interface {
+	Create(uint64, *TokenDetails) error
+}
+
+// Deletable allows to destroy a record from the datastore
+type Deletable interface {
+	Delete(string) (int64, error)
+}
+
+// Fetchable allows to fetch a record from the datastore
+type Fetchable interface {
+	Fetch(*AccessDetails) (uint64, error)
+}
+
+// Refreshable allows to create a new token and save it to datastore
+type Refreshable interface {
+	Refresh(*gin.Context)
+}
+
 // AccessDetails data structure
 type AccessDetails struct {
 	AccessUUID string
 	UserID     uint64
 }
 
-// TokenDetails data structure for tokens
-type TokenDetails struct {
-	AccessToken  string
-	RefreshToken string
-	AccessUUID   string
-	RefreshUUID  string
-	AtExpires    int64
-	RtExpires    int64
+// Service implements Authable to provide AccessDetails persistence in a datastore
+type Service struct {
+	Redis *redis.Client
 }
 
-// Tokens data structure for token pair
-type Tokens struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
-var client *redis.Client
-
-// CreateAuth persists userId under AccessUUID
-func CreateAuth(userID uint64, td *TokenDetails) error {
+// Create persists userId under AccessUUID
+func (s *Service) Create(userID uint64, td *TokenDetails) error {
 	at := time.Unix(td.AtExpires, 0) //converting Unix to UTC(to Time object)
 	rt := time.Unix(td.RtExpires, 0)
 	now := time.Now()
 
-	errAccess := client.Set(td.AccessUUID, strconv.Itoa(int(userID)), at.Sub(now)).Err()
+	errAccess := s.Redis.Set(td.AccessUUID, strconv.Itoa(int(userID)), at.Sub(now)).Err()
 	if errAccess != nil {
 		return errAccess
 	}
-	errRefresh := client.Set(td.RefreshUUID, strconv.Itoa(int(userID)), rt.Sub(now)).Err()
+	errRefresh := s.Redis.Set(td.RefreshUUID, strconv.Itoa(int(userID)), rt.Sub(now)).Err()
 	if errRefresh != nil {
 		return errRefresh
 	}
 	return nil
 }
 
-// DeleteAuth deletes AccessUUID key in data store
-func DeleteAuth(uuid string) (int64, error) {
-	deleted, err := client.Unlink(uuid).Result()
+// Delete deletes AccessUUID key in data store
+func (s *Service) Delete(uuid string) (int64, error) {
+	deleted, err := s.Redis.Unlink(uuid).Result()
 	if err != nil {
 		return 0, err
 	}
 	return deleted, nil
 }
 
-// FetchAuth restores UserID under AccessUUID in data store
-func FetchAuth(authD *AccessDetails) (uint64, error) {
-	userid, err := client.Get(authD.AccessUUID).Result()
+// Fetch restores UserID under AccessUUID key in data store
+func (s *Service) Fetch(authD *AccessDetails) (uint64, error) {
+	userid, err := s.Redis.Get(authD.AccessUUID).Result()
 	if err != nil {
 		return 0, err
 	}
@@ -73,7 +88,7 @@ func FetchAuth(authD *AccessDetails) (uint64, error) {
 }
 
 // Refresh validates refresh_token to provide a new token pair
-func Refresh(c *gin.Context) {
+func (s *Service) Refresh(c *gin.Context) {
 	mapToken := map[string]string{}
 	if err := c.ShouldBindJSON(&mapToken); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
@@ -108,7 +123,7 @@ func Refresh(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, "Error occurred")
 		return
 	}
-	deleted, err := DeleteAuth(refreshUUID)
+	deleted, err := s.Delete(refreshUUID)
 	if err != nil || deleted == 0 {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return
@@ -118,7 +133,7 @@ func Refresh(c *gin.Context) {
 		c.JSON(http.StatusForbidden, err.Error())
 		return
 	}
-	err = CreateAuth(userID, ts)
+	err = s.Create(userID, ts)
 	if err != nil {
 		c.JSON(http.StatusForbidden, err.Error())
 		return

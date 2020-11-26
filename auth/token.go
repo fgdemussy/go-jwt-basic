@@ -12,6 +12,22 @@ import (
 	"github.com/twinj/uuid"
 )
 
+// TokenDetails data structure for tokens
+type TokenDetails struct {
+	AccessToken  string
+	RefreshToken string
+	AccessUUID   string
+	RefreshUUID  string
+	AtExpires    int64
+	RtExpires    int64
+}
+
+// Tokens data structure for token pair
+type Tokens struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 // CreateToken generates access and refresh token pairs
 func CreateToken(userID uint64) (*TokenDetails, error) {
 	td := &TokenDetails{}

@@ -31,6 +31,9 @@ var u1 = &user{
 	Password: "pass",
 }
 
+var redisClient *redis.Client
+var authService auth.Authable
+
 func init() {
 	_, ok := os.LookupEnv("ACCESS_SECRET")
 	if !ok {
@@ -44,17 +47,20 @@ func init() {
 	if !ok {
 		dsn = "localhost:6379"
 	}
-	client = redis.NewClient(&redis.Options{
+	redisClient = redis.NewClient(&redis.Options{
 		Addr: dsn, //redis port
 	})
-	_, err := client.Ping().Result()
+	_, err := redisClient.Ping().Result()
 	if err != nil {
 		panic(err)
+	}
+	authService = &auth.Service{
+		Redis: redisClient,
 	}
 }
 
 func main() {
-	router.POST("/token/refresh", auth.Refresh)
+	router.POST("/token/refresh", authService.Refresh)
 	router.POST("/login", login)
 	router.POST("/logout", middleware.TokenAuthMiddleware(), logout)
 	router.POST("/todos", middleware.TokenAuthMiddleware(), createTodo)
@@ -76,7 +82,7 @@ func login(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	err = auth.CreateAuth(u1.ID, token)
+	err = authService.Create(u1.ID, token)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 	}
@@ -98,7 +104,7 @@ func createTodo(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	userID, err := auth.FetchAuth(tokenAuth)
+	userID, err := authService.Fetch(tokenAuth)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return
@@ -116,7 +122,7 @@ func logout(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, err.Error())
 		return
 	}
-	deleted, err := auth.DeleteAuth(accessDetails.AccessUUID)
+	deleted, err := authService.Delete(accessDetails.AccessUUID)
 	if err != nil || deleted == 0 {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return

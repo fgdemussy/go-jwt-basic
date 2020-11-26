@@ -60,7 +60,7 @@ func init() {
 }
 
 func main() {
-	router.POST("/token/refresh", authService.Refresh)
+	router.POST("/token/refresh", refresh)
 	router.POST("/login", login)
 	router.POST("/logout", middleware.TokenAuthMiddleware(), logout)
 	router.POST("/todos", middleware.TokenAuthMiddleware(), createTodo)
@@ -128,4 +128,8 @@ func logout(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, "successfully logged out")
+}
+
+func refresh(c *gin.Context) {
+	authService.Refresh(c)
 }

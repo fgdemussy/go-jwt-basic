@@ -69,21 +69,21 @@ func ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 		return nil, err
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if ok && token.Valid {
-		accessUUID, ok := claims["access_uuid"].(string)
-		if !ok {
-			return nil, err
-		}
-		userID, err := strconv.ParseUint(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		return &AccessDetails{
-			AccessUUID: accessUUID,
-			UserID:     userID,
-		}, nil
+	if !ok || !token.Valid {
+		return nil, err
 	}
-	return nil, err
+	accessUUID, ok := claims["access_uuid"].(string)
+	if !ok {
+		return nil, err
+	}
+	userID, err := strconv.ParseUint(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &AccessDetails{
+		AccessUUID: accessUUID,
+		UserID:     userID,
+	}, nil
 }
 
 // TokenValid validates wether a request has a valid authorization token

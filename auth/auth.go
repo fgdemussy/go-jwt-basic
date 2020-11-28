@@ -1,13 +1,9 @@
 package auth
 
 import (
-	"fmt"
-	"net/http"
-	"os"
 	"strconv"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 )
@@ -16,7 +12,6 @@ import (
 type Authable interface {
 	Creator
 	Deletable
-	Refreshable
 	Fetchable
 }
 
@@ -85,62 +80,4 @@ func (s *Service) Fetch(authD *AccessDetails) (uint64, error) {
 	}
 	userID, _ := strconv.ParseUint(userid, 10, 64)
 	return userID, nil
-}
-
-// Refresh validates refresh_token to provide a new token pair
-func (s *Service) Refresh(c *gin.Context) {
-	mapToken := map[string]string{}
-	if err := c.ShouldBindJSON(&mapToken); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-	refreshToken := mapToken["refresh_token"]
-	token, err := jwt.Parse(refreshToken, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method %v", t.Header["alg"])
-		}
-		return []byte(os.Getenv("REFRESH_SECRET")), nil
-	})
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, "Refresh token expired")
-		return
-	}
-	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
-		c.JSON(http.StatusUnauthorized, err)
-		return
-	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		c.JSON(http.StatusUnauthorized, "refresh expired")
-	}
-	refreshUUID, ok := claims["refresh_uuid"].(string)
-	if !ok {
-		c.JSON(http.StatusUnprocessableEntity, "Error occurred")
-		return
-	}
-	userID, err := strconv.ParseUint(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, "Error occurred")
-		return
-	}
-	deleted, err := s.Delete(refreshUUID)
-	if err != nil || deleted == 0 {
-		c.JSON(http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	ts, err := CreateToken(userID)
-	if err != nil {
-		c.JSON(http.StatusForbidden, err.Error())
-		return
-	}
-	err = s.Create(userID, ts)
-	if err != nil {
-		c.JSON(http.StatusForbidden, err.Error())
-		return
-	}
-	tokens := &Tokens{
-		AccessToken:  ts.AccessToken,
-		RefreshToken: ts.RefreshToken,
-	}
-	c.JSON(http.StatusOK, tokens)
 }

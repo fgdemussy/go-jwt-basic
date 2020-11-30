@@ -12,6 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type todo struct {
+	UserID uint64 `json:"user_id"`
+	Title  string `json:"title"`
+}
+
 type user struct {
 	ID       uint64 `json:"id"`
 	Username string `json:"username"`
@@ -26,8 +31,8 @@ var u1 = &user{
 
 // Handler resolves endpoints enabling token auth
 type Handler struct {
-	Tokenizer auth.Tokenizer
-	Authable  auth.Authable
+	Token   *auth.Token
+	Service *auth.Service
 }
 
 // Login validates user credentials against data store and returns a token
@@ -41,12 +46,12 @@ func (h *Handler) Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, "Please provide login credentials")
 		return
 	}
-	token, err := h.Tokenizer.CreateToken(u1.ID)
+	token, err := h.Token.CreateToken(u1.ID)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	err = h.Authable.Create(u1.ID, token)
+	err = h.Service.Create(u1.ID, token)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 	}
@@ -93,17 +98,17 @@ func (h *Handler) Refresh(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, "Error occurred")
 		return
 	}
-	deleted, err := h.Authable.Delete(refreshUUID)
+	deleted, err := h.Service.Delete(refreshUUID)
 	if err != nil || deleted == 0 {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	ts, err := h.Tokenizer.CreateToken(userID)
+	ts, err := h.Token.CreateToken(userID)
 	if err != nil {
 		c.JSON(http.StatusForbidden, err.Error())
 		return
 	}
-	err = h.Authable.Create(userID, ts)
+	err = h.Service.Create(userID, ts)
 	if err != nil {
 		c.JSON(http.StatusForbidden, err.Error())
 		return
@@ -113,4 +118,41 @@ func (h *Handler) Refresh(c *gin.Context) {
 		RefreshToken: ts.RefreshToken,
 	}
 	c.JSON(http.StatusOK, tokens)
+}
+
+func (h *Handler) CreateTodo(c *gin.Context) {
+	var td *todo
+	if err := c.ShouldBindJSON(&td); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, "invalid json")
+		return
+	}
+	tokenAuth, err := h.Token.ExtractTokenMetadata(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, err := h.Service.Fetch(tokenAuth)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	td.UserID = userID
+
+	//you can proceed to save the Todo to a database
+	//but we will just return it to the caller here:
+	c.JSON(http.StatusCreated, td)
+}
+
+func (h *Handler) Logout(c *gin.Context) {
+	accessDetails, err := h.Token.ExtractTokenMetadata(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, err.Error())
+		return
+	}
+	deleted, err := h.Service.Delete(accessDetails.AccessUUID)
+	if err != nil || deleted == 0 {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	c.JSON(http.StatusOK, "successfully logged out")
 }

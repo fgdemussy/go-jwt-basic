@@ -52,7 +52,7 @@ func init() {
 	})
 	_, err := redisClient.Ping().Result()
 	if err != nil {
-		panic(err)
+		log.Fatalln("Redis service is unavailable")
 	}
 	authService = &auth.Service{
 		Redis: redisClient,

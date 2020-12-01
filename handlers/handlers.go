@@ -35,6 +35,11 @@ type Handler struct {
 	Service *auth.Service
 }
 
+// NewHandler returns a handler with proper token auth & persistence
+func NewHandler(t *auth.Token, s *auth.Service) *Handler {
+	return &Handler{Token: t, Service: s}
+}
+
 // Login validates user credentials against data store and returns a token
 func (h *Handler) Login(c *gin.Context) {
 	var u user

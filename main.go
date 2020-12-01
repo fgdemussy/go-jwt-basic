@@ -65,7 +65,7 @@ func main() {
 	}
 	authService = auth.NewService(redisClient)
 	tokenService = auth.NewToken()
-	handler := &handlers.Handler{Token: tokenService, Service: authService}
+	handler := handlers.NewHandler(tokenService, authService)
 	router.POST("/token/refresh", handler.Refresh)
 	router.POST("/login", handler.Login)
 	router.POST("/logout", middleware.TokenAuthMiddleware(), handler.Logout)

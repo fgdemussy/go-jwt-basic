@@ -8,13 +8,6 @@ import (
 	"github.com/go-redis/redis"
 )
 
-// Authable provides an interface to deal with required operations to manage AccessDetails in a datastore
-type Authable interface {
-	Creator
-	Deletable
-	Fetchable
-}
-
 // Creator allows persistence in a datastore
 type Creator interface {
 	Create(uint64, *TokenDetails) error

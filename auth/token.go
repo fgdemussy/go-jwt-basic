@@ -95,8 +95,8 @@ func (t *Token) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 	}, nil
 }
 
-// TokenValid validates wether a request has a valid authorization token
-func TokenValid(r *http.Request) error {
+// Valid validates wether a request has a valid authorization token
+func Valid(r *http.Request) error {
 	token, err := verify(r)
 	if err != nil {
 		return err

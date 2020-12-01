@@ -73,7 +73,7 @@ func (t *Token) CreateToken(userID uint64) (*TokenDetails, error) {
 
 // ExtractTokenMetadata extracts AccessUUID and UserID from token payload
 func (t *Token) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
-	token, err := verifyToken(r)
+	token, err := verify(r)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (t *Token) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 
 // TokenValid validates wether a request has a valid authorization token
 func TokenValid(r *http.Request) error {
-	token, err := verifyToken(r)
+	token, err := verify(r)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func extract(r *http.Request) string {
 	return ""
 }
 
-func verifyToken(r *http.Request) (*jwt.Token, error) {
+func verify(r *http.Request) (*jwt.Token, error) {
 	tokenString := extract(r)
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		//Make sure that the token method conform to "SigningMethodHMAC"

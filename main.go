@@ -19,6 +19,17 @@ var authService *auth.Service
 var tokenService *auth.Token
 var handler handlers.Handler
 
+func newRedisClient(dsn string) (*redis.Client, error) {
+	redisClient = redis.NewClient(&redis.Options{
+		Addr: dsn, //redis port
+	})
+	_, err := redisClient.Ping().Result()
+	if err != nil {
+		return nil, err
+	}
+	return redisClient, nil
+}
+
 func init() {
 	env := os.Getenv("GO_JWT_ENV")
 	if env == "" {
@@ -48,10 +59,7 @@ func init() {
 }
 
 func main() {
-	redisClient = redis.NewClient(&redis.Options{
-		Addr: os.Getenv("REDIS_DSN"), //redis port
-	})
-	_, err := redisClient.Ping().Result()
+	redisClient, err := newRedisClient(os.Getenv("REDIS_DSN"))
 	if err != nil {
 		log.Fatalln("Redis service is unavailable")
 	}

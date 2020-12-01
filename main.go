@@ -63,9 +63,8 @@ func main() {
 	if err != nil {
 		log.Fatalln("Redis service is unavailable")
 	}
-	authService = &auth.Service{
-		Redis: redisClient,
-	}
+	authService = auth.NewService(redisClient)
+	tokenService = auth.NewToken()
 	handler := &handlers.Handler{Token: tokenService, Service: authService}
 	router.POST("/token/refresh", handler.Refresh)
 	router.POST("/login", handler.Login)

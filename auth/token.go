@@ -21,6 +21,11 @@ type Tokenizer interface {
 // Token implements Tokenizer
 type Token struct{}
 
+// NewToken returns a new Token
+func NewToken() *Token {
+	return new(Token)
+}
+
 // TokenDetails data structure for tokens
 type TokenDetails struct {
 	AccessToken  string

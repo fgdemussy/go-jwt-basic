@@ -8,6 +8,14 @@ import (
 	"github.com/go-redis/redis"
 )
 
+// Authable provides capabilities to manage auth in a simple datastore
+type Authable interface {
+	Creator
+	Deletable
+	Fetchable
+	Refreshable
+}
+
 // Creator allows persistence in a datastore
 type Creator interface {
 	Create(uint64, *TokenDetails) error
@@ -37,6 +45,11 @@ type AccessDetails struct {
 // Service implements Authable to provide AccessDetails persistence in a datastore
 type Service struct {
 	Redis *redis.Client
+}
+
+// NewService returns anew service with a redis connection ready.
+func NewService(r *redis.Client) *Service {
+	return &Service{Redis: r}
 }
 
 // Create persists userId under AccessUUID

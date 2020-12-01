@@ -12,6 +12,15 @@ import (
 	"github.com/twinj/uuid"
 )
 
+// Tokenizer allows token management and validation
+type Tokenizer interface {
+	CreateToken(uint64) (*TokenDetails, error)
+	ExtractTokenMetadata(*http.Request) (*AccessDetails, error)
+}
+
+// Token implements Tokenizer
+type Token struct{}
+
 // TokenDetails data structure for tokens
 type TokenDetails struct {
 	AccessToken  string
@@ -29,7 +38,7 @@ type Tokens struct {
 }
 
 // CreateToken generates access and refresh token pairs
-func CreateToken(userID uint64) (*TokenDetails, error) {
+func (t *Token) CreateToken(userID uint64) (*TokenDetails, error) {
 	td := &TokenDetails{}
 	td.AtExpires = time.Now().Add(time.Minute * 15).Unix()
 	td.AccessUUID = uuid.NewV4().String()
@@ -63,7 +72,7 @@ func CreateToken(userID uint64) (*TokenDetails, error) {
 }
 
 // ExtractTokenMetadata extracts AccessUUID and UserID from token payload
-func ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
+func (t *Token) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 	token, err := verifyToken(r)
 	if err != nil {
 		return nil, err

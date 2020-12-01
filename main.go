@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
+	"github.com/joho/godotenv"
 
 	"jwt-todo/auth"
 	"jwt-todo/handlers"
@@ -19,6 +20,19 @@ var tokenService *auth.Token
 var handler handlers.Handler
 
 func init() {
+	env := os.Getenv("GO_JWT_ENV")
+	if env == "" {
+		env = "development"
+	}
+	godotenv.Load(".env." + env + ".local")
+	if "test" != env {
+		godotenv.Load(".env.local")
+	}
+	godotenv.Load(".env." + env)
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Failed loading .env with error: %v", err)
+	}
 	_, ok := os.LookupEnv("ACCESS_SECRET")
 	if !ok {
 		log.Fatalln("You need to define ACCESS_SECRET environment variable first.")

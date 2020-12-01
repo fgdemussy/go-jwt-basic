@@ -14,10 +14,12 @@ import (
 )
 
 var router = gin.Default()
-var redisClient *redis.Client
-var authService *auth.Service
-var tokenService *auth.Token
-var handler handlers.Handler
+var (
+	redisClient *redis.Client
+	authService *auth.Service
+	tokenService *auth.Token
+	handler *handlers.Handler
+)
 
 func newRedisClient(dsn string) (*redis.Client, error) {
 	redisClient = redis.NewClient(&redis.Options{
@@ -65,7 +67,7 @@ func main() {
 	}
 	authService = auth.NewService(redisClient)
 	tokenService = auth.NewToken()
-	handler := handlers.NewHandler(tokenService, authService)
+	handler = handlers.NewHandler(tokenService, authService)
 	router.POST("/token/refresh", handler.Refresh)
 	router.POST("/login", handler.Login)
 	router.POST("/logout", middleware.TokenAuthMiddleware(), handler.Logout)

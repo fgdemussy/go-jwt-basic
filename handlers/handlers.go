@@ -125,6 +125,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 	c.JSON(http.StatusOK, tokens)
 }
 
+// CreateTodo returns a valid todo
 func (h *Handler) CreateTodo(c *gin.Context) {
 	var td *todo
 	if err := c.ShouldBindJSON(&td); err != nil {
@@ -148,6 +149,7 @@ func (h *Handler) CreateTodo(c *gin.Context) {
 	c.JSON(http.StatusCreated, td)
 }
 
+// Logout deletes session on data store, invalidating token credentials
 func (h *Handler) Logout(c *gin.Context) {
 	accessDetails, err := h.Token.ExtractTokenMetadata(c.Request)
 	if err != nil {

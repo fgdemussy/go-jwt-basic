@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
@@ -12,7 +16,7 @@ import (
 	"jwt-todo/handlers"
 	"jwt-todo/middleware"
 )
-
+var port string
 var router = gin.Default()
 var (
 	redisClient *redis.Client
@@ -58,6 +62,10 @@ func init() {
 	if !ok {
 		log.Fatalln("You need to define REDIS_DSN environment variable first.")
 	}
+	port, ok = os.LookupEnv("PORT")
+	if !ok {
+		port = "8080"
+	}
 }
 
 func main() {
@@ -72,5 +80,27 @@ func main() {
 	router.POST("/login", handler.Login)
 	router.POST("/logout", middleware.TokenAuthMiddleware(), handler.Logout)
 	router.POST("/todos", middleware.TokenAuthMiddleware(), handler.CreateTodo)
-	log.Fatal(router.Run())
+
+	appAddr := ":" + port
+	srv := &http.Server{
+		Addr: appAddr,
+		Handler: router,
+	}
+	go func ()  {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen %s\n", err)
+		}
+	}()
+
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	log.Println("Shuting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server Shutdown:", err)
+	}
+	log.Println("Server exiting")
 }
